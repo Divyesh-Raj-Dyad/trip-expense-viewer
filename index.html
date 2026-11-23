@@ -88,7 +88,11 @@ h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
   }
 
   function load(){
-    var h = location.hash.replace(/^#/, '') || window.TRIP_PAYLOAD || '';
+    // The trip can arrive three ways: ?d=CODE (survives most chat apps), #CODE, or built into the page (PC preview).
+    var q = '';
+    try { q = new URLSearchParams(location.search).get('d') || ''; } catch (e) {}
+    q = q.replace(/[^A-Za-z0-9_-]/g, '');
+    var h = q || location.hash.replace(/^#/, '') || window.TRIP_PAYLOAD || '';
     if (h) {
       try { var d = decode(h); store(false, KEY, h); return {data:d, fresh:true}; } catch (e) { return {error:true}; }
     }
@@ -116,6 +120,33 @@ h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
         ? 'Ask your friend to send the share link again.'
         : 'Open the link your friend sent you in iMessage.'));
       app.appendChild(emp);
+
+      // Fallback: paste the whole message, link or code that was sent.
+      var box = el('div', 'card');
+      box.style.marginTop = '14px';
+      box.appendChild(el('div', 't', 'Paste the message or code here'));
+      box.appendChild(el('div', 's', 'If the link did not open your trip, paste the whole message you received (or the long code) below.'));
+      var ta = document.createElement('textarea');
+      ta.rows = 4;
+      ta.setAttribute('aria-label', 'Pasted link or code');
+      ta.style.cssText = 'width:100%;margin-top:10px;font:inherit;font-size:14px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)';
+      var btn = el('button', '', 'Show trip');
+      btn.style.cssText = 'margin-top:10px;width:100%;font:inherit;font-weight:600;padding:12px;border:0;border-radius:10px;background:var(--accent);color:var(--on-accent)';
+      btn.onclick = function(){
+        var t = ta.value.replace(/\s+/g, '');
+        var m = t.match(/[?&]d=([A-Za-z0-9_-]+)/) || t.match(/#([A-Za-z0-9_-]+)/);
+        var code = m ? m[1] : t.replace(/[^A-Za-z0-9_-]/g, '');
+        if (!code) return;
+        try { decode(code); } catch (e) { msg.textContent = 'That looks incomplete. Ask your friend to send it again.'; return; }
+        store(false, KEY, code);
+        render();
+      };
+      var msg = el('div', 's', '');
+      msg.style.marginTop = '8px';
+      box.appendChild(ta);
+      box.appendChild(btn);
+      box.appendChild(msg);
+      app.appendChild(box);
       return;
     }
     var d = r.data, fmt = money(d.c);
